@@ -11,7 +11,56 @@ from sklearn.metrics import mean_absolute_error, r2_score
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Universal AI Forecasting Engine", layout="wide")
+# --- Page Configuration ---
+st.set_page_config(page_title="Universal AI Forecasting Engine", layout="wide")
 
+# ==========================================
+# 🔒 PHASE 2: SECURE LOGIN GATEWAY
+# ==========================================
+# 1. Check if the user is already logged in
+if 'authenticated' not in st.session_state:
+    st.session_state['authenticated'] = False
+
+# 2. Build the Login UI if they are NOT logged in
+if not st.session_state['authenticated']:
+    st.title("🔒 Enterprise AI Analytics Workspace")
+    st.markdown("Please enter your organizational credentials to access the forecasting engine.")
+    
+    # Create a visual box for the login form
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password") # Hides the text as dots
+        submit_button = st.form_submit_button("Secure Login")
+        
+        if submit_button:
+            # Check the credentials (you can change these later!)
+            if username == "admin" and password == "sales2026":
+                st.session_state['authenticated'] = True
+                st.success("Authentication successful! Loading workspace...")
+                st.rerun() # Instantly refreshes the page to reveal the dashboard
+            else:
+                st.error("Invalid credentials. Please contact your system administrator.")
+    
+    # 3. THE BOUNCER: Stop the rest of the code from running
+    st.stop() 
+
+
+# ==========================================
+# 📈 PHASE 3: THE MAIN DASHBOARD
+# ==========================================
+# (If the code reaches here, it means they logged in successfully!)
+
+# Add a logout button to the sidebar
+if st.sidebar.button("🚪 Logout"):
+    st.session_state['authenticated'] = False
+    st.rerun()
+
+st.title("🤖 Universal AI Forecasting & Analytics Engine")
+st.markdown("Upload **any** historical time-series dataset. The system will auto-detect columns, handle data engineering, and train your chosen AI model dynamically.")
+
+# --- File Ingestion ---
+# ... (THE REST OF YOUR EXISTING UPLOAD AND AI CODE STAYS EXACTLY THE SAME BELOW THIS LINE) ...
+uploaded_file = st.sidebar.file_uploader("Upload CSV File", type=['csv'])
 st.title("🤖 Universal AI Forecasting & Analytics Engine")
 st.markdown("Upload **any** historical time-series dataset. The system will auto-detect columns, handle data engineering, and train your chosen AI model dynamically.")
 
