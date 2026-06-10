@@ -9,153 +9,172 @@ from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
 
-st.set_page_config(page_title="AI+ Sales Forecasting", layout="wide")
+# --- Page Configuration ---
+st.set_page_config(page_title="Universal AI Forecasting Engine", layout="wide")
 
-st.title("📈 Sales Forecast using AI")
-st.markdown("Upload your cleaned sales dataset to generate insights and AI predictions.")
+st.title("🤖 Universal AI Forecasting & Analytics Engine")
+st.markdown("Upload **any** historical time-series dataset. The system will auto-detect columns, handle data engineering, and train your chosen AI model dynamically.")
 
-# File Uploader
-uploaded_file = st.file_uploader("Upload CSV File", type=['csv'])
+# --- File Ingestion ---
+uploaded_file = st.sidebar.file_uploader("Upload CSV File", type=['csv'])
 
 if uploaded_file is not None:
-    # Load Data
+    # Read file
     df = pd.read_csv(uploaded_file)
-    df['Date'] = pd.to_datetime(df['Date'])
     
-    st.subheader("Dataset Preview")
-    st.dataframe(df.head())
+    st.write(f"### 📋 Raw Dataset Preview ({len(df)} rows × {len(df.columns)} columns)")
+    st.dataframe(df.head(5))
 
-    # Sidebar Filters
-    st.sidebar.header("Filters")
+    st.sidebar.markdown("---")
+    st.sidebar.header("🎛️ Schema Alignment")
+
+    # 1. DYNAMIC DATE DETECTION
+    # Try to find columns that look like dates automatically
+    date_options = []
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            try:
+                # Test parse first 5 rows to see if it's a date
+                pd.to_datetime(df[col].head(5))
+                date_options.append(col)
+            except:
+                pass
+        elif np.issubdtype(df[col].dtype, np.datetime64):
+            date_options.append(col)
+
+    # Let user confirm or choose the correct date column
+    date_col = st.sidebar.selectbox("Select Timeline/Date Column", options=df.columns, 
+                                    index=df.columns.get_loc(date_options[0]) if date_options else 0)
     
-    # Model Selection
-    model_choice = st.sidebar.selectbox(
-        "Select AI Model",
-        ("Gradient Boosting", "Random Forest", "Linear Regression", "Decision Tree")
-    )
+    # Standardize selected date column
+    df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+    df = df.dropna(subset=[date_col]).sort_values(by=date_col)
+
+    # 2. TARGET SELECTION (What do we want to forecast?)
+    # Filter for numeric columns as forecasting targets
+    numeric_cols = list(df.select_dtypes(include=[np.number]).columns)
     
-    # Data Filters
-    selected_region = st.sidebar.multiselect("Filter by Region", df['Region'].unique(), default=df['Region'].unique())
-    selected_segment = st.sidebar.multiselect("Filter by Customer Segment", df['Customer_Segment'].unique(), default=df['Customer_Segment'].unique())
-    selected_category = st.sidebar.multiselect("Filter by Product Category", df['Category'].unique(), default=df['Category'].unique())
+    if not numeric_cols:
+        st.error("No numerical columns found in your dataset to forecast. Please check your data.")
+        st.stop()
 
-    # Apply Filters
-    filtered_df = df[
-        (df['Region'].isin(selected_region)) & 
-        (df['Customer_Segment'].isin(selected_segment)) &
-        (df['Category'].isin(selected_category))
-    ].copy()
+    target_col = st.sidebar.selectbox("Select Target Column to Forecast", options=numeric_cols, 
+                                      index=len(numeric_cols)-1 if len(numeric_cols) > 1 else 0)
 
-    if filtered_df.empty:
-        st.warning("No data available for the selected filters.")
-    else:
-        st.markdown("---")
-        
-        # Row 1: Charts
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("Average Sales: Weekday vs Weekend")
-            # Creating a weekend flag (Saturday=5, Sunday=6)
-            filtered_df['Is_Weekend'] = filtered_df['Date'].dt.dayofweek >= 5
-            wknd_sales = filtered_df.groupby('Is_Weekend')['Units_Sold'].mean().rename(index={False: 'Weekday', True: 'Weekend'})
-            fig, ax = plt.subplots()
-            sns.barplot(x=wknd_sales.index, y=wknd_sales.values, ax=ax, palette="pastel")
-            ax.set_ylabel("Average Units Sold")
-            st.pyplot(fig)
-            
-        with col2:
-            st.subheader("Average Sales by Promotion Type")
-            promo_sales = filtered_df.groupby('Promotion_Type')['Units_Sold'].mean().reset_index()
-            fig, ax = plt.subplots()
-            sns.barplot(data=promo_sales, x='Promotion_Type', y='Units_Sold', ax=ax, palette="husl")
-            ax.set_ylabel("Average Units Sold")
-            st.pyplot(fig)
+    # 3. DYNAMIC CATEGORICAL FILTERS
+    st.sidebar.markdown("---")
+    st.sidebar.header("📊 Dashboard Live Filters")
+    
+    # Identify high-value categorical filters (text columns with realistic cardinality)
+    categorical_cols = list(df.select_dtypes(include=['object', 'category', 'string']).columns)
+    if date_col in categorical_cols:
+        categorical_cols.remove(date_col)
 
-        # Row 2: Charts
-        col3, col4 = st.columns(2)
-        
-        with col3:
-            st.subheader("Total Units Sold by Product Category")
-            cat_sales = filtered_df.groupby('Category')['Units_Sold'].sum().reset_index()
-            fig, ax = plt.subplots()
-            sns.barplot(data=cat_sales, x='Category', y='Units_Sold', ax=ax, palette="Set2")
-            st.pyplot(fig)
+    # Automatically construct live UI filters based on what exists in the file
+    filtered_df = df.copy()
+    active_filters = {}
+    
+    # Limit to top 3 categorical columns to avoid overwhelming the sidebar UI
+    for col in categorical_cols[:3]:
+        unique_vals = ['All'] + list(df[col].dropna().unique())
+        selected_val = st.sidebar.selectbox(f"Filter by {col}", unique_vals)
+        if selected_val != 'All':
+            filtered_df = filtered_df[filtered_df[col] == selected_val]
 
-        with col4:
-            st.subheader("Product Category Share")
-            fig, ax = plt.subplots()
-            ax.pie(cat_sales['Units_Sold'], labels=cat_sales['Category'], autopct='%1.1f%%', colors=sns.color_palette("Set2"))
-            st.pyplot(fig)
+    # --- DATAFRAME CLEANING & FEATURE SELECTION ---
+    # Automatic feature engineering based on dates
+    filtered_df['Engine_Month'] = filtered_df[date_col].dt.month
+    filtered_df['Engine_DayOfWeek'] = filtered_df[date_col].dt.dayofweek
+    filtered_df['Engine_IsWeekend'] = filtered_df[date_col].dt.dayofweek >= 5
 
-        st.markdown("---")
-        st.header(f"🤖 AI Forecasting Model: {model_choice}")
-        
-        # Machine Learning Prep
-        st.write("Training model on current filtered data...")
-        
-        # Prepare categorical features
-        ml_df = pd.get_dummies(filtered_df, columns=['Category', 'Promotion_Type', 'Customer_Segment', 'Region'], drop_first=True)
-        
-        # Select numeric features for model
-        features = [col for col in ml_df.columns if col not in ['Date', 'Product_ID', 'Units_Sold', 'Revenue', 'Competitor_Pricing_Indicator']]
-        
-       # Prepare data for AI (One-Hot Encoding)
-        # Convert all useful text categories into 1s and 0s
-        ml_df = pd.get_dummies(filtered_df, columns=['Category', 'Promotion_Type', 'Customer_Segment', 'Region', 'Day_of_Week'], drop_first=True)
-        
-        # BULLETPROOF FIX: Automatically drop ANY remaining text columns (like Product_ID) so the math model never crashes
-        ml_df = ml_df.select_dtypes(exclude=['object', 'string'])
-        
-        # Drop target and non-predictive columns
-        features = [col for col in ml_df.columns if col not in ['Date', 'Units_Sold', 'Revenue', 'Is_Weekend']]
-        X = ml_df[features]
-        y = filtered_df['Units_Sold'] # Pull target from original filtered data
-        
-        X = ml_df[features]
-        y = ml_df['Units_Sold']
-        
-        if len(X) > 10: # Ensure enough data to train
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=False)
-            
-            # Model Selection Logic
-            if model_choice == "Gradient Boosting":
-                model = GradientBoostingRegressor(random_state=42)
-            elif model_choice == "Random Forest":
-                model = RandomForestRegressor(random_state=42)
-            elif model_choice == "Linear Regression":
-                model = LinearRegression()
-            else:
-                model = DecisionTreeRegressor(random_state=42)
-                
-            model.fit(X_train, y_train)
-            predictions = model.predict(X_test)
-            
-            mae = mean_absolute_error(y_test, predictions)
-            r2 = r2_score(y_test, predictions)
-            
-            col_m1, col_m2 = st.columns(2)
-            col_m1.metric("Mean Absolute Error (MAE)", f"{mae:.2f} units")
-            col_m2.metric("R-Squared (Accuracy Score)", f"{r2:.2f}")
-            
-            st.subheader("Actual vs Predicted Sales")
-            fig, ax = plt.subplots(figsize=(10, 4))
-            ax.plot(range(len(y_test)), y_test.values, label='Actual Units Sold', color='orange')
-            ax.plot(range(len(predictions)), predictions, label='Predicted Units Sold', linestyle='--', color='green')
-            ax.set_xlabel("Sample Days (Test Set)")
-            ax.set_ylabel("Units Sold")
-            ax.legend()
-            st.pyplot(fig)
-            
-            # Recommendations (Step 8)
-            st.subheader("📌 Business Recommendations")
-            st.info("""
-            **Inventory Planning:** Use the predicted peaks to order stock proactively and avoid shortages.
-            **Staffing:** Schedule additional staff during predicted high-demand periods (e.g., weekends/holidays).
-            **Marketing:** Align your promotional spend with periods where the AI predicts a slump, or double down on high-performing promotion types identified in the charts above.
-            """)
-            
+    # Fill NaNs globally depending on types safely
+    for col in filtered_df.columns:
+        if filtered_df[col].dtype in [np.float64, np.int64]:
+            filtered_df[col] = filtered_df[col].fillna(0)
         else:
-            st.error("Not enough data points after filtering to train the AI model. Please adjust your filters.")
+            filtered_df[col] = filtered_df[col].fillna("Unknown")
+
+    # --- DYNAMIC VISUALIZATIONS ---
+    st.write("### 📈 Automated Data Exploration")
+    v_col1, v_col2 = st.columns(2)
+
+    with v_col1:
+        st.write(f"**Timeline Trend: Average {target_col} Over Time**")
+        fig_time, ax_time = plt.subplots(figsize=(7, 3.5))
+        time_series = filtered_df.groupby(filtered_df[date_col].dt.to_period('M'))[target_col].mean()
+        time_series.index = time_series.index.astype(str)
+        ax_time.plot(time_series.index, time_series.values, marker='o', color='#1f77b4')
+        ax_time.tick_params(axis='x', rotation=45)
+        st.pyplot(fig_time)
+
+    with v_col2:
+        if len(categorical_cols) > 0:
+            primary_cat = categorical_cols[0]
+            st.write(f"**Distribution: Proportional {target_col} by {primary_cat}**")
+            fig_pie, ax_pie = plt.subplots(figsize=(7, 3.5))
+            cat_group = filtered_df.groupby(primary_cat)[target_col].sum().reset_index()
+            ax_pie.pie(cat_group[target_col], labels=cat_group[primary_cat], autopct='%1.1f%%', startangle=90, colors=sns.color_palette('pastel'))
+            ax_pie.axis('equal')
+            st.pyplot(fig_pie)
+        else:
+            st.info("Upload data containing string columns to unlock distribution graphs.")
+
+    # --- ML AUTOMATION PIPELINE ---
+    st.write("---")
+    st.sidebar.markdown("---")
+    st.sidebar.header("🤖 Model Configurations")
+    model_choice = st.sidebar.selectbox("Choose Learning Algorithm", 
+        ["Gradient Boosting", "Random Forest", "Linear Regression", "Decision Tree"])
+
+    st.write(f"### 🔮 AI Predictive Analytics Model: {model_choice}")
+
+    # Prepare data for AI without referencing hardcoded text keys
+    # Dynamically extract tracking variables
+    ml_features_df = filtered_df.drop(columns=[date_col, target_col], errors='ignore')
+    
+    # Automatically convert whatever categorical features exist into dynamic One-Hot matrix columns
+    ml_encoded = pd.get_dummies(ml_features_df, drop_first=True)
+    
+    # Clear out structural strings or IDs that cannot map to weights
+    X = ml_encoded.select_dtypes(include=[np.number, bool])
+    y = filtered_df[target_col]
+
+    if len(X) > 15:
+        # Train-Test Split (sequential for chronological accuracy)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=False)
+
+        if model_choice == "Gradient Boosting":
+            model = GradientBoostingRegressor(random_state=42)
+        elif model_choice == "Random Forest":
+            model = RandomForestRegressor(random_state=42)
+        elif model_choice == "Linear Regression":
+            model = LinearRegression()
+        else:
+            model = DecisionTreeRegressor(random_state=42)
+
+        # Train and Forecast
+        model.fit(X_train, y_train)
+        predictions = model.predict(X_test)
+        
+        # Performance Evaluation Metrics
+        mae = mean_absolute_error(y_test, predictions)
+        r2 = r2_score(y_test, predictions)
+
+        m_col1, m_col2 = st.columns(2)
+        m_col1.metric("Mean Absolute Error (MAE)", f"{mae:.2f}")
+        m_col2.metric("R-Squared (Explaining Variance)", f"{r2:.2f}")
+
+        # Plot Forecast Validation Line Chart
+        fig_forecast, ax_forecast = plt.subplots(figsize=(14, 4))
+        ax_forecast.plot(range(len(y_test)), y_test.values, label='Actual Historical Values', color='orange', alpha=0.8, marker='o')
+        ax_forecast.plot(range(len(predictions)), predictions, label='AI Forecast Path', color='green', linestyle='--', alpha=0.8, marker='x')
+        ax_forecast.set_title("AI Predictive Tracking Verification Validation Curve")
+        ax_forecast.set_xlabel("Sequential Chronological Testing Timeline (Unseen Test Block)")
+        ax_forecast.set_ylabel(target_col)
+        ax_forecast.legend()
+        st.pyplot(fig_forecast)
+    else:
+        st.warning("Insufficient variation entries available to optimize AI modeling matrices. Loosen sidebar parameters to augment sample row quantities.")
+
 else:
-    st.info("Please upload your sales CSV file in the sidebar to begin.")
+    st.info("🔌 Awaiting system payload connection. Drop an engineering log file template into the sidebar interface to initiate model optimization modules.")
