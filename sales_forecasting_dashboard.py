@@ -64,8 +64,11 @@ uploaded_file = st.sidebar.file_uploader("Upload CSV File", type=['csv'])
 st.title("🤖 Universal AI Forecasting & Analytics Engine")
 st.markdown("Upload **any** historical time-series dataset. The system will auto-detect columns, handle data engineering, and train your chosen AI model dynamically.")
 
-# --- File Ingestion ---
+# Replace this line:
 uploaded_file = st.sidebar.file_uploader("Upload CSV File", type=['csv'])
+
+# With this line:
+uploaded_file = st.sidebar.file_uploader("Upload CSV File", type=['csv'], key="unique_data_uploader")
 
 if uploaded_file is not None:
     # Read file
