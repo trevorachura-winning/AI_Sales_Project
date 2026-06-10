@@ -28,23 +28,27 @@ if uploaded_file is not None:
     st.sidebar.markdown("---")
     st.sidebar.header("🎛️ Schema Alignment")
 
-    # 1. DYNAMIC DATE DETECTION
-    # Try to find columns that look like dates automatically
+    # 1. DYNAMIC DATE DETECTION (UPDATED: Bulletproof Pandas 2.0 compatibility)
     date_options = []
     for col in df.columns:
-        if df[col].dtype == 'object':
+        # Check if Pandas already securely knows it is a datetime column
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            date_options.append(col)
+        # Check if it is text/string that can safely be parsed into a date
+        elif pd.api.types.is_string_dtype(df[col]) or df[col].dtype == 'object':
             try:
-                # Test parse first 5 rows to see if it's a date
+                # Test parse first 5 rows to see if it's a date format
                 pd.to_datetime(df[col].head(5))
                 date_options.append(col)
             except:
                 pass
-        elif np.issubdtype(df[col].dtype, np.datetime64):
-            date_options.append(col)
+
+    if not date_options:
+        st.error("No Date/Timeline columns could be detected. Please ensure your CSV has a valid date column.")
+        st.stop()
 
     # Let user confirm or choose the correct date column
-    date_col = st.sidebar.selectbox("Select Timeline/Date Column", options=df.columns, 
-                                    index=df.columns.get_loc(date_options[0]) if date_options else 0)
+    date_col = st.sidebar.selectbox("Select Timeline/Date Column", options=date_options, index=0)
     
     # Standardize selected date column
     df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
@@ -72,7 +76,6 @@ if uploaded_file is not None:
 
     # Automatically construct live UI filters based on what exists in the file
     filtered_df = df.copy()
-    active_filters = {}
     
     # Limit to top 3 categorical columns to avoid overwhelming the sidebar UI
     for col in categorical_cols[:3]:
@@ -89,7 +92,7 @@ if uploaded_file is not None:
 
     # Fill NaNs globally depending on types safely
     for col in filtered_df.columns:
-        if filtered_df[col].dtype in [np.float64, np.int64]:
+        if pd.api.types.is_numeric_dtype(filtered_df[col]):
             filtered_df[col] = filtered_df[col].fillna(0)
         else:
             filtered_df[col] = filtered_df[col].fillna("Unknown")
@@ -139,7 +142,7 @@ if uploaded_file is not None:
     X = ml_encoded.select_dtypes(include=[np.number, bool])
     y = filtered_df[target_col]
 
-    if len(X) > 15:
+    if len(X) > 5:  # Lowered threshold slightly for smaller datasets like our SaaS sample
         # Train-Test Split (sequential for chronological accuracy)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=False)
 
@@ -174,7 +177,7 @@ if uploaded_file is not None:
         ax_forecast.legend()
         st.pyplot(fig_forecast)
     else:
-        st.warning("Insufficient variation entries available to optimize AI modeling matrices. Loosen sidebar parameters to augment sample row quantities.")
+        st.warning("Insufficient variation entries available to optimize AI modeling matrices. Upload a dataset with more rows to augment sample row quantities.")
 
 else:
     st.info("🔌 Awaiting system payload connection. Drop an engineering log file template into the sidebar interface to initiate model optimization modules.")
