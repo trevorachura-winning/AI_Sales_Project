@@ -17,6 +17,59 @@ if 'authenticated' not in st.session_state or not st.session_state['authenticate
     st.warning("🛑 Access Denied. Please log in through the main Gateway page first.")
     st.stop()
 
+# ==========================================
+# 🎨 CUSTOM UI & ANIMATION INJECTION
+# ==========================================
+st.markdown("""
+<style>
+    /* 1. Global Fade-In Animation (Mimics Tailwind's 'animate-fade-in-up') */
+    .block-container {
+        animation: fadeInUp 0.8s ease-out;
+    }
+    @keyframes fadeInUp {
+        0% { opacity: 0; transform: translateY(20px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* 2. Sleek Button Hover Effects (Mimics Tailwind's 'hover:scale-105 shadow-md') */
+    .stButton>button {
+        transition: all 0.3s ease-in-out !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+    }
+    .stButton>button:hover {
+        transform: scale(1.03) !important;
+        box-shadow: 0 10px 20px rgba(0, 82, 204, 0.2) !important;
+        border-color: #0052cc !important;
+        color: #0052cc !important;
+    }
+
+    /* 3. Polished Metric Cards (Mimics Tailwind's 'bg-white rounded-xl shadow hover:shadow-lg') */
+    div[data-testid="metric-container"] {
+        background-color: #ffffff;
+        border: 1px solid #edf2f7;
+        padding: 15px 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        transition: all 0.3s ease;
+        border-left: 4px solid #0052cc;
+    }
+    div[data-testid="metric-container"]:hover {
+        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        transform: translateY(-3px);
+    }
+
+    /* 4. Smooth Tab Transitions */
+    button[data-baseweb="tab"] {
+        transition: all 0.2s ease-in-out;
+    }
+    button[data-baseweb="tab"]:hover {
+        background-color: #f4f5f7;
+        border-radius: 6px;
+    }
+</style>
+""", unsafe_allow_html=True) 
+
 # --- THE MAIN DASHBOARD ---
 st.title("📊 Strategic Analytics & Intelligence Engine")
 st.markdown("Upload your dataset to generate AI forecasts, rank lead quality, and extract automated executive summaries.")
