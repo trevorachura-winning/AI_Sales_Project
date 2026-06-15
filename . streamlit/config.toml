@@ -1,0 +1,15 @@
+[theme]
+# The main accent color for buttons, sliders, and loading bars
+primaryColor = "#0052CC"
+
+# The main background color of the dashboard workspace
+backgroundColor = "#FFFFFF"
+
+# The background color of the left sidebar and secondary boxes
+secondaryBackgroundColor = "#F4F5F7"
+
+# The global text color
+textColor = "#091E42"
+
+# The global typography style (Options: "sans serif", "serif", "monospace")
+font = "poppins"
