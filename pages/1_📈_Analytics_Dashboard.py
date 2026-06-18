@@ -9,8 +9,9 @@ from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import MinMaxScaler
+import urllib.parse
 
-st.set_page_config(page_title="Strategic Analytics Dashboard", layout="wide")
+st.set_page_config(page_title="Flame AI-Sales Analytics", layout="wide")
 
 # --- Security Check ---
 if 'authenticated' not in st.session_state or not st.session_state['authenticated']:
@@ -22,67 +23,32 @@ if 'authenticated' not in st.session_state or not st.session_state['authenticate
 # ==========================================
 st.markdown("""
 <style>
-    /* 1. Global Fade-In Animation (Mimics Tailwind's 'animate-fade-in-up') */
-    .block-container {
-        animation: fadeInUp 0.8s ease-out;
-    }
-    @keyframes fadeInUp {
-        0% { opacity: 0; transform: translateY(20px); }
-        100% { opacity: 1; transform: translateY(0); }
-    }
-    
-    /* 2. Sleek Button Hover Effects (Mimics Tailwind's 'hover:scale-105 shadow-md') */
-    .stButton>button {
-        transition: all 0.3s ease-in-out !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-    }
-    .stButton>button:hover {
-        transform: scale(1.03) !important;
-        box-shadow: 0 10px 20px rgba(0, 82, 204, 0.2) !important;
-        border-color: #0052cc !important;
-        color: #0052cc !important;
-    }
-
-    /* 3. Polished Metric Cards (Mimics Tailwind's 'bg-white rounded-xl shadow hover:shadow-lg') */
-    div[data-testid="metric-container"] {
-        background-color: #ffffff;
-        border: 1px solid #edf2f7;
-        padding: 15px 20px;
-        border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        transition: all 0.3s ease;
-        border-left: 4px solid #0052cc;
-    }
-    div[data-testid="metric-container"]:hover {
-        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-        transform: translateY(-3px);
-    }
-
-    /* 4. Smooth Tab Transitions */
-    button[data-baseweb="tab"] {
-        transition: all 0.2s ease-in-out;
-    }
-    button[data-baseweb="tab"]:hover {
-        background-color: #f4f5f7;
-        border-radius: 6px;
-    }
+    .block-container { animation: fadeInUp 0.8s ease-out; }
+    @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+    .stButton>button { transition: all 0.3s ease-in-out !important; border-radius: 8px !important; font-weight: 600 !important; }
+    .stButton>button:hover { transform: scale(1.03) !important; box-shadow: 0 10px 20px rgba(0, 82, 204, 0.2) !important; }
+    div[data-testid="metric-container"] { background-color: #ffffff; border: 1px solid #edf2f7; padding: 15px 20px; border-radius: 12px; transition: all 0.3s ease; border-left: 4px solid #0052cc; }
+    div[data-testid="metric-container"]:hover { box-shadow: 0 10px 25px rgba(0,0,0,0.08); transform: translateY(-3px); }
 </style>
-""", unsafe_allow_html=True) 
+""", unsafe_allow_html=True)
 
 # --- THE MAIN DASHBOARD ---
-st.title("📊 Strategic Analytics & Intelligence Engine")
+st.title("🔥 Flame AI-Sales Intelligence Engine")
 st.markdown("Upload your dataset to generate AI forecasts, rank lead quality, and extract automated executive summaries.")
+
+# ⚡ PERFORMANCE BOOST: Cache the data so it loads instantly after the first upload
+@st.cache_data(show_spinner="Ingesting and mapping data into RAM...")
+def load_data(file):
+    return pd.read_csv(file)
 
 uploaded_file = st.sidebar.file_uploader("Upload CSV File", type=['csv'], key="unique_data_uploader")
 
 if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
+    df = load_data(uploaded_file) # Uses the high-speed cache
     
     st.sidebar.markdown("---")
     st.sidebar.header("🎛️ Schema Alignment")
 
-    # 1. Date Detection
     date_options = [col for col in df.columns if pd.api.types.is_datetime64_any_dtype(df[col])]
     if not date_options:
         for col in df.columns:
@@ -101,7 +67,6 @@ if uploaded_file is not None:
     df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
     df = df.dropna(subset=[date_col]).sort_values(by=date_col)
 
-    # 2. Target Selection
     numeric_cols = list(df.select_dtypes(include=[np.number]).columns)
     if not numeric_cols:
         st.error("No numerical columns found to analyze.")
@@ -110,7 +75,6 @@ if uploaded_file is not None:
     target_col = st.sidebar.selectbox("Select Primary Target (Revenue/Sales)", options=numeric_cols, 
                                       index=len(numeric_cols)-1 if len(numeric_cols) > 1 else 0)
 
-    # 3. Categorical Filters
     st.sidebar.markdown("---")
     st.sidebar.header("📊 Live Filters")
     categorical_cols = list(df.select_dtypes(include=['object', 'category', 'string']).columns)
@@ -123,7 +87,6 @@ if uploaded_file is not None:
         if selected_val != 'All':
             filtered_df = filtered_df[filtered_df[col] == selected_val]
 
-    # Data Engineering
     filtered_df['Engine_Month'] = filtered_df[date_col].dt.month
     for col in filtered_df.columns:
         if pd.api.types.is_numeric_dtype(filtered_df[col]):
@@ -131,18 +94,12 @@ if uploaded_file is not None:
         else:
             filtered_df[col] = filtered_df[col].fillna("Unknown")
 
-    # ==========================================
-    # 📑 WORKSPACE TABS ARCHITECTURE
-    # ==========================================
     tab_forecast, tab_leads, tab_summary = st.tabs([
         "📈 AI Sales Forecasting", 
         "🎯 Lead Scoring Matrix", 
         "💡 Executive Summary & Next Steps"
     ])
 
-    # ------------------------------------------
-    # TAB 1: AI FORECASTING (Existing Logic)
-    # ------------------------------------------
     with tab_forecast:
         st.write("### 🔮 Predictive Analytics Model")
         model_choice = st.selectbox("Choose AI Algorithm", ["Gradient Boosting", "Random Forest", "Linear Regression"])
@@ -171,9 +128,6 @@ if uploaded_file is not None:
         else:
             st.warning("Not enough data to train the AI.")
 
-    # ------------------------------------------
-    # TAB 2: LEAD SCORING MATRIX
-    # ------------------------------------------
     with tab_leads:
         st.write("### 🎯 Dynamic Lead Scoring Engine")
         st.markdown("Select an identifier (e.g., Neighborhood or Plan Level) and the metrics that dictate 'quality'. The engine will normalize these metrics into a 0-100 Lead Score.")
@@ -183,22 +137,15 @@ if uploaded_file is not None:
             with l_col1:
                 entity_col = st.selectbox("Select Lead Identifier", categorical_cols)
             with l_col2:
-                # Default to the target column if possible
                 scoring_factors = st.multiselect("Select Scoring Factors (Metrics)", numeric_cols, default=[target_col])
             
             if scoring_factors:
-                # Group data by the entity (e.g., total sales per neighborhood)
                 lead_data = filtered_df.groupby(entity_col)[scoring_factors].sum().reset_index()
-                
-                # Normalize the data using Min-Max Scaler
                 scaler = MinMaxScaler()
                 scaled_data = scaler.fit_transform(lead_data[scoring_factors])
-                
-                # Calculate average score across selected factors and convert to 100-point scale
                 lead_data['Lead_Score'] = scaled_data.mean(axis=1) * 100
                 lead_data['Lead_Score'] = lead_data['Lead_Score'].round(1)
                 
-                # Sort and display
                 top_leads = lead_data.sort_values(by='Lead_Score', ascending=False).reset_index(drop=True)
                 st.dataframe(top_leads.style.background_gradient(subset=['Lead_Score'], cmap='Greens'), use_container_width=True)
             else:
@@ -206,13 +153,9 @@ if uploaded_file is not None:
         else:
             st.info("Your dataset needs text categories and numeric values to score leads.")
 
-    # ------------------------------------------
-    # TAB 3: EXECUTIVE SUMMARY & TEXT RECOMMENDATIONS
-    # ------------------------------------------
     with tab_summary:
         st.write("### 💡 Automated Executive Summary")
         
-        # High-Level KPIs
         total_value = filtered_df[target_col].sum()
         avg_value = filtered_df[target_col].mean()
         max_value = filtered_df[target_col].max()
@@ -225,7 +168,6 @@ if uploaded_file is not None:
         st.markdown("---")
         st.write("### 📌 Strategic Next Steps")
         
-        # Dynamic Text Engine
         if len(categorical_cols) > 0:
             top_category_col = categorical_cols[0]
             category_sums = filtered_df.groupby(top_category_col)[target_col].sum().sort_values(ascending=False)
@@ -239,3 +181,24 @@ if uploaded_file is not None:
 
 else:
     st.info("🔌 Awaiting system payload connection. Upload a dataset in the sidebar to initiate the strategic intelligence modules.")
+
+# ==========================================
+# 📫 DIRECT FEEDBACK SYSTEM
+# ==========================================
+st.sidebar.markdown("---")
+st.sidebar.header("💬 Feedback & Support")
+with st.sidebar.form("feedback_form"):
+    st.write("Help us improve Flame AI-Sales!")
+    feedback_type = st.selectbox("Topic", ["General Feedback", "Bug Report", "Feature Request"])
+    feedback_text = st.text_area("Your Feedback")
+    submit_feedback = st.form_submit_button("Generate Email")
+    
+    if submit_feedback and feedback_text:
+        # Encode the text safely for a URL
+        subject = urllib.parse.quote(f"Flame AI-Sales Feedback: {feedback_type}")
+        body = urllib.parse.quote(feedback_text)
+        
+        # Creates a secure HTML button that opens the user's email client
+        mail_link = f"mailto:trevorachura@gmail.com?subject={subject}&body={body}"
+        st.markdown(f'<a href="{mail_link}" target="_blank" style="display: block; text-align: center; padding: 10px; background-color: #0052cc; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">📩 Send via Email Client</a>', unsafe_allow_html=True)
+        st.success("Click the button above to send your feedback securely!")
