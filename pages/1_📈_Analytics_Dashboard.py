@@ -36,7 +36,7 @@ st.markdown("""
 st.title("🔥 Flame AI-Sales Intelligence Engine")
 st.markdown("Upload your dataset to generate AI forecasts, rank lead quality, and extract automated executive summaries.")
 
-# ⚡ PERFORMANCE BOOST: Cache the data so it loads instantly after the first upload
+# ⚡ PERFORMANCE BOOST: Cache the data
 @st.cache_data(show_spinner="Ingesting and mapping data into RAM...")
 def load_data(file):
     return pd.read_csv(file)
@@ -44,7 +44,7 @@ def load_data(file):
 uploaded_file = st.sidebar.file_uploader("Upload CSV File", type=['csv'], key="unique_data_uploader")
 
 if uploaded_file is not None:
-    df = load_data(uploaded_file) # Uses the high-speed cache
+    df = load_data(uploaded_file) 
     
     st.sidebar.markdown("---")
     st.sidebar.header("🎛️ Schema Alignment")
@@ -183,7 +183,7 @@ else:
     st.info("🔌 Awaiting system payload connection. Upload a dataset in the sidebar to initiate the strategic intelligence modules.")
 
 # ==========================================
-# 📫 DIRECT FEEDBACK SYSTEM
+# 📫 DIRECT FEEDBACK SYSTEM & LOGOUT
 # ==========================================
 st.sidebar.markdown("---")
 st.sidebar.header("💬 Feedback & Support")
@@ -194,11 +194,14 @@ with st.sidebar.form("feedback_form"):
     submit_feedback = st.form_submit_button("Generate Email")
     
     if submit_feedback and feedback_text:
-        # Encode the text safely for a URL
         subject = urllib.parse.quote(f"Flame AI-Sales Feedback: {feedback_type}")
         body = urllib.parse.quote(feedback_text)
-        
-        # Creates a secure HTML button that opens the user's email client
         mail_link = f"mailto:trevorachura@gmail.com?subject={subject}&body={body}"
         st.markdown(f'<a href="{mail_link}" target="_blank" style="display: block; text-align: center; padding: 10px; background-color: #0052cc; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">📩 Send via Email Client</a>', unsafe_allow_html=True)
         st.success("Click the button above to send your feedback securely!")
+
+# Global Logout Button (Pushed to bottom of sidebar)
+st.sidebar.markdown("<br>" * 3, unsafe_allow_html=True)
+if st.sidebar.button("🚪 Secure Logout", use_container_width=True, key="analytics_logout"):
+    st.session_state['authenticated'] = False
+    st.rerun()
