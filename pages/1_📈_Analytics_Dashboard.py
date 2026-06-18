@@ -13,14 +13,10 @@ import urllib.parse
 
 st.set_page_config(page_title="Flame AI-Sales Analytics", layout="wide")
 
-# --- Security Check ---
 if 'authenticated' not in st.session_state or not st.session_state['authenticated']:
     st.warning("🛑 Access Denied. Please log in through the main Gateway page first.")
     st.stop()
 
-# ==========================================
-# 🎨 CUSTOM UI & ANIMATION INJECTION
-# ==========================================
 st.markdown("""
 <style>
     .block-container { animation: fadeInUp 0.8s ease-out; }
@@ -32,11 +28,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- THE MAIN DASHBOARD ---
 st.title("🔥 Flame AI-Sales Intelligence Engine")
 st.markdown("Upload your dataset to generate AI forecasts, rank lead quality, and extract automated executive summaries.")
 
-# ⚡ PERFORMANCE BOOST: Cache the data
 @st.cache_data(show_spinner="Ingesting and mapping data into RAM...")
 def load_data(file):
     return pd.read_csv(file)
@@ -182,9 +176,6 @@ if uploaded_file is not None:
 else:
     st.info("🔌 Awaiting system payload connection. Upload a dataset in the sidebar to initiate the strategic intelligence modules.")
 
-# ==========================================
-# 📫 DIRECT FEEDBACK SYSTEM & LOGOUT
-# ==========================================
 st.sidebar.markdown("---")
 st.sidebar.header("💬 Feedback & Support")
 with st.sidebar.form("feedback_form"):
@@ -200,7 +191,6 @@ with st.sidebar.form("feedback_form"):
         st.markdown(f'<a href="{mail_link}" target="_blank" style="display: block; text-align: center; padding: 10px; background-color: #0052cc; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">📩 Send via Email Client</a>', unsafe_allow_html=True)
         st.success("Click the button above to send your feedback securely!")
 
-# Global Logout Button (Pushed to bottom of sidebar)
 st.sidebar.markdown("<br>" * 3, unsafe_allow_html=True)
 if st.sidebar.button("🚪 Secure Logout", use_container_width=True, key="analytics_logout"):
     st.session_state['authenticated'] = False
